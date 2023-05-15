@@ -130,6 +130,23 @@ func processDirectory(dirPath string, results *Results, hashFunc func() hash.Has
 	return newFileData, nil
 }
 
+func saveResults(dirPath string, results *Results) error {
+	resultsFilePath := filepath.Join(dirPath, "results.json")
+	resultsFile, err := os.Create(resultsFilePath)
+	if err != nil {
+		return err
+	}
+	defer resultsFile.Close()
+
+	encoder := json.NewEncoder(resultsFile)
+	err = encoder.Encode(results)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func removeDuplicateFiles(dirPaths []string, hashFunc func() hash.Hash) error {
 	hashToFileData := make(map[string][]FileData)
 
@@ -142,6 +159,8 @@ func removeDuplicateFiles(dirPaths []string, hashFunc func() hash.Hash) error {
 			if err != nil {
 				return err
 			}
+			defer resultsFile.Close()
+
 			decoder := json.NewDecoder(resultsFile)
 			err = decoder.Decode(&results)
 			if err != nil {
@@ -165,12 +184,7 @@ func removeDuplicateFiles(dirPaths []string, hashFunc func() hash.Hash) error {
 
 		results.Files = newFileData
 
-		resultsFile, err := os.Create(resultsFilePath)
-		if err != nil {
-			return err
-		}
-		encoder := json.NewEncoder(resultsFile)
-		err = encoder.Encode(results)
+		err = saveResults(dirPath, &results)
 		if err != nil {
 			return err
 		}
@@ -195,8 +209,9 @@ func removeDuplicateFiles(dirPaths []string, hashFunc func() hash.Hash) error {
 			for _, file := range files {
 				if file.Path != latestFile.Path {
 					fmt.Println("Removing file:", file.Path)
-					if err := os.Remove(file.Path); err != nil {
-						fmt.Println("Error removing file:", file.Path)
+					err := os.Remove(file.Path)
+					if err != nil {
+						return fmt.Errorf("error removing file %s: %v", file.Path, err)
 					}
 				}
 			}
